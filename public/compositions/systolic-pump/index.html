@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Systolic pump</title>
+    <style>
+      :root {
+        --paper: #fbfcfe; --ink: #11212b; --muted: #566571; --line: #d9e2ec;
+        --teal: #15a39c; --teal-deep: #0d7c77; --plum: #4f6d7a; --teal-bg: #e2f3f1;
+      }
+      html, body { margin: 0; background: var(--paper); }
+      * { box-sizing: border-box; }
+      .stage { font-family: "Chivo Mono", ui-monospace, monospace; padding: 28px; }
+      .cap { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: 0.05em; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <svg id="svg" viewBox="0 0 420 360" width="100%" style="max-width:420px;display:block;margin:0 auto"></svg>
+      <div class="cap">a diagonal wavefront of multiply-accumulates sweeps the array</div>
+    </div>
+
+    <script>
+      const N = 4, CELL = 78, PAD = 36;
+      const DURATION = 5.0;
+      const svg = document.getElementById("svg");
+      const SVGNS = "http://www.w3.org/2000/svg";
+      const A = Array.from({ length: N }, (_, i) => Array.from({ length: N }, (_, j) => ((i + j) % 3) + 1));
+      const B = Array.from({ length: N }, (_, i) => Array.from({ length: N }, (_, j) => ((i * 2 + j) % 3) + 1));
+      const cells = [];
+
+      for (let i = 0; i < N; i++) {
+        cells[i] = [];
+        for (let j = 0; j < N; j++) {
+          const x = PAD + j * CELL, y = PAD + i * CELL;
+          const r = document.createElementNS(SVGNS, "rect");
+          r.setAttribute("x", x + 5); r.setAttribute("y", y + 5);
+          r.setAttribute("width", CELL - 10); r.setAttribute("height", CELL - 10);
+          r.setAttribute("rx", 10); r.setAttribute("fill", "var(--paper)");
+          r.setAttribute("stroke", "var(--line)"); r.setAttribute("stroke-width", 1.5);
+          svg.appendChild(r);
+          const txt = document.createElementNS(SVGNS, "text");
+          txt.setAttribute("x", x + CELL / 2); txt.setAttribute("y", y + CELL / 2 + 7);
+          txt.setAttribute("text-anchor", "middle");
+          txt.setAttribute("font-family", "Source Serif 4, Georgia, serif");
+          txt.setAttribute("font-size", 20); txt.setAttribute("fill", "var(--muted)");
+          txt.textContent = "·";
+          svg.appendChild(txt);
+          cells[i][j] = { r, txt };
+        }
+      }
+
+      const tMax = 3 * (N - 1);
+      // seek(t): map t→clock cycle; light the active diagonal, accumulate behind it.
+      window.seek = function (t) {
+        const cyc = Math.round(t * tMax);
+        for (let i = 0; i < N; i++) {
+          for (let j = 0; j < N; j++) {
+            const k = cyc - i - j;
+            const active = k >= 0 && k < N;
+            const upto = Math.min(k, N - 1);
+            let acc = 0;
+            for (let kk = 0; kk <= upto && k >= 0; kk++) acc += A[i][kk] * B[kk][j];
+            const { r, txt } = cells[i][j];
+            r.setAttribute("fill", active ? "var(--teal-bg)" : "var(--paper)");
+            r.setAttribute("stroke", active ? "var(--teal-deep)" : (upto >= N - 1 ? "var(--teal)" : "var(--line)"));
+            r.setAttribute("stroke-width", active ? 2.5 : 1.5);
+            txt.textContent = k >= 0 ? acc : "·";
+            txt.setAttribute("fill", k >= 0 ? "var(--ink)" : "var(--muted)");
+          }
+        }
+      };
+
+      if (!window.__RENDER__) {
+        const start = performance.now();
+        (function frame(now) {
+          window.seek((((now - start) / 1000) / DURATION) % 1);
+          requestAnimationFrame(frame);
+        })(start);
+      } else {
+        window.seek(0);
+      }
+
+      const postH = () =>
+        parent.postMessage({ type: "embed-height", height: document.body.scrollHeight }, "*");
+      new ResizeObserver(postH).observe(document.body);
+      window.addEventListener("load", postH);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.vite/
+# rendered video output is produced by the render-videos CI workflow
+public/videos/*.mp4
