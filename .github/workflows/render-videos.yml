@@ -1,0 +1,48 @@
+name: Render HyperFrames video demos
+
+# Renders public/compositions/<id>/index.html → public/videos/<id>.mp4 using
+# headless Chrome (HyperFrames technique) and commits the MP4s back, which then
+# triggers the Pages deploy. Runs on demand, or when a composition changes.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/youtube-transcription-setup-w39zzg
+    paths:
+      - "public/compositions/**"
+      - "scripts/render-videos.mjs"
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Render-only deps (kept out of the app build to keep Pages fast).
+      - run: npm i --no-save puppeteer ffmpeg-static
+      - run: node scripts/render-videos.mjs
+
+      - name: Upload videos artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-demos
+          path: public/videos/*.mp4
+
+      - name: Commit rendered videos
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f public/videos/*.mp4
+          if git diff --cached --quiet; then
+            echo "No video changes."
+          else
+            git commit -m "ci: render HyperFrames video demos"
+            git push
+          fi

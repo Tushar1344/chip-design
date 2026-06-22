@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gate propagation</title>
+    <style>
+      :root {
+        --paper: #fbfcfe; --ink: #11212b; --muted: #566571;
+        --line: #d9e2ec; --teal: #15a39c; --teal-deep: #0d7c77;
+      }
+      html, body { margin: 0; background: var(--paper); }
+      * { box-sizing: border-box; }
+      .stage { font-family: "Chivo Mono", ui-monospace, monospace; padding: 28px; }
+      .cap { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: 0.05em; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <svg id="svg" viewBox="0 0 640 220" width="100%">
+        <!-- wires -->
+        <line id="w0" x1="60" y1="110" x2="180" y2="110" stroke="var(--line)" stroke-width="3" />
+        <line id="w1" x1="240" y1="110" x2="360" y2="110" stroke="var(--line)" stroke-width="3" />
+        <line id="w2" x1="420" y1="110" x2="540" y2="110" stroke="var(--line)" stroke-width="3" />
+        <!-- gates -->
+        <g id="g1"><rect x="180" y="84" width="60" height="52" rx="10" fill="var(--paper)" stroke="var(--line)" stroke-width="2"/><text x="210" y="115" text-anchor="middle" font-size="11" fill="var(--muted)">NAND</text></g>
+        <g id="g2"><rect x="360" y="84" width="60" height="52" rx="10" fill="var(--paper)" stroke="var(--line)" stroke-width="2"/><text x="390" y="115" text-anchor="middle" font-size="11" fill="var(--muted)">NAND</text></g>
+        <!-- labels -->
+        <text x="40" y="115" text-anchor="middle" font-size="14" fill="var(--ink)">A</text>
+        <text id="out" x="560" y="115" font-size="16" fill="var(--muted)">·</text>
+        <!-- travelling pulse -->
+        <circle id="pulse" cx="60" cy="110" r="7" fill="var(--teal-deep)" />
+      </svg>
+      <div class="cap">a logic edge propagating gate-by-gate · one gate delay per hop</div>
+    </div>
+
+    <script>
+      const DURATION = 4.0; // seconds, one loop
+      const X0 = 60, X1 = 540;
+      const svgEl = (id) => document.getElementById(id);
+
+      function lit(el, on) {
+        el.setAttribute("stroke", on ? "var(--teal-deep)" : "var(--line)");
+      }
+      function gateFlash(g, on) {
+        g.querySelector("rect").setAttribute("stroke", on ? "var(--teal)" : "var(--line)");
+      }
+
+      // seek(t): t in [0,1], position every element deterministically (HyperFrames hook)
+      window.seek = function (t) {
+        const x = X0 + (X1 - X0) * t;
+        svgEl("pulse").setAttribute("cx", x);
+        lit(svgEl("w0"), x > 60);
+        lit(svgEl("w1"), x > 240);
+        lit(svgEl("w2"), x > 420);
+        gateFlash(svgEl("g1"), x > 180 && x < 260);
+        gateFlash(svgEl("g2"), x > 360 && x < 440);
+        const out = svgEl("out");
+        out.textContent = t > 0.92 ? "1" : "·";
+        out.setAttribute("fill", t > 0.92 ? "var(--teal-deep)" : "var(--muted)");
+      };
+
+      // Live autoplay loop (skipped during deterministic render).
+      if (!window.__RENDER__) {
+        const start = performance.now();
+        (function frame(now) {
+          const t = ((now - start) / 1000 / DURATION) % 1;
+          window.seek(t);
+          requestAnimationFrame(frame);
+        })(start);
+      } else {
+        window.seek(0);
+      }
+
+      // Auto-resize when embedded as an iframe.
+      const postH = () =>
+        parent.postMessage({ type: "embed-height", height: document.body.scrollHeight }, "*");
+      new ResizeObserver(postH).observe(document.body);
+      window.addEventListener("load", postH);
+    </script>
+  </body>
+</html>

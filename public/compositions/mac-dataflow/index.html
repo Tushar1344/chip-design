@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MAC dataflow</title>
+    <style>
+      :root {
+        --paper: #fbfcfe; --ink: #11212b; --muted: #566571; --line: #d9e2ec;
+        --teal-deep: #0d7c77; --plum: #4f6d7a; --teal-bg: #e2f3f1;
+      }
+      html, body { margin: 0; background: var(--paper); }
+      * { box-sizing: border-box; }
+      .stage { font-family: "Chivo Mono", ui-monospace, monospace; padding: 28px; }
+      .cap { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: 0.05em; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <svg id="svg" viewBox="0 0 640 240" width="100%">
+        <!-- MAC unit -->
+        <rect x="250" y="70" width="150" height="100" rx="14" fill="var(--teal-bg)" stroke="var(--teal-deep)" stroke-width="2" />
+        <text x="325" y="108" text-anchor="middle" font-size="13" fill="var(--teal-deep)">MAC</text>
+        <text x="325" y="132" text-anchor="middle" font-size="11" fill="var(--muted)">× then +</text>
+        <!-- input streams -->
+        <text x="40" y="100" font-size="12" fill="var(--teal-deep)">aᵢ</text>
+        <text x="40" y="155" font-size="12" fill="var(--plum)">bᵢ</text>
+        <circle id="da" cx="60" cy="95" r="13" fill="var(--teal-deep)" opacity="0" />
+        <text id="dat" x="60" y="99" text-anchor="middle" font-size="11" fill="#fff" opacity="0"></text>
+        <circle id="db" cx="60" cy="150" r="13" fill="var(--plum)" opacity="0" />
+        <text id="dbt" x="60" y="154" text-anchor="middle" font-size="11" fill="#fff" opacity="0"></text>
+        <!-- accumulator readout -->
+        <text x="500" y="86" text-anchor="middle" font-size="10" fill="var(--muted)">ACCUMULATOR</text>
+        <text id="acc" x="500" y="140" text-anchor="middle" font-family="Source Serif 4, Georgia, serif" font-size="46" fill="var(--teal-deep)">0</text>
+      </svg>
+      <div class="cap">acc ← acc + aᵢ·bᵢ · one term folded in per beat</div>
+    </div>
+
+    <script>
+      const A = [3, 1, 2, 2], B = [2, 4, 1, 3];
+      const N = A.length;
+      const DURATION = 5.0;
+      const el = (id) => document.getElementById(id);
+
+      // seek(t): drive N beats; in each beat a pair flies in and the acc updates.
+      window.seek = function (t) {
+        const beat = Math.min(N - 1, Math.floor(t * N));
+        const local = (t * N) % 1; // 0..1 within current beat
+        // operand travels from x=60 to the MAC at x=250
+        const x = 60 + (250 - 60) * Math.min(1, local * 1.4);
+        const vis = local < 0.75 ? 1 : 0;
+        el("da").setAttribute("cx", x); el("da").setAttribute("opacity", vis);
+        el("dat").setAttribute("x", x); el("dat").setAttribute("opacity", vis);
+        el("dat").textContent = A[beat];
+        el("db").setAttribute("cx", x); el("db").setAttribute("opacity", vis);
+        el("dbt").setAttribute("x", x); el("dbt").setAttribute("opacity", vis);
+        el("dbt").textContent = B[beat];
+        // accumulator includes all completed beats (+ current once operand arrives)
+        const completed = local > 0.6 ? beat + 1 : beat;
+        let acc = 0;
+        for (let i = 0; i < completed; i++) acc += A[i] * B[i];
+        el("acc").textContent = acc;
+      };
+
+      if (!window.__RENDER__) {
+        const start = performance.now();
+        (function frame(now) {
+          window.seek((((now - start) / 1000) / DURATION) % 1);
+          requestAnimationFrame(frame);
+        })(start);
+      } else {
+        window.seek(0);
+      }
+
+      const postH = () =>
+        parent.postMessage({ type: "embed-height", height: document.body.scrollHeight }, "*");
+      new ResizeObserver(postH).observe(document.body);
+      window.addEventListener("load", postH);
+    </script>
+  </body>
+</html>
